@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **DiagVI: LogitNorm classification loss and a classifier-logits option.** `DIAGVI` (and
+  `DIAGVAE`) take `classification_loss` (`"ce"`, the default, or `"logitnorm"`),
+  `logitnorm_tau` (default 0.1) and `classifier_logits`. `"logitnorm"` is the LogitNorm loss
+  of Wei et al. (ICML 2022, [arXiv:2205.09310](https://arxiv.org/abs/2205.09310), eq. 4) on the
+  classifier logits. The default classifiers still end in a softmax, so `"ce"` keeps the
+  cross-entropy on probabilities (a double softmax, as in scANVI before scvi-tools 1.1) and
+  reproduces earlier results exactly; `classifier_logits=True` gives plain cross-entropy on
+  logits. The new arguments are saved with the model; models saved before load with the defaults.
+
+### Fixed
+
+- **DiagVI: `predict_celltype` no longer applies a second softmax.** With the default
+  classifiers, `probabilities` and `confidence` were the softmax of probabilities, compressed
+  toward uniform. They are now the classifier's probabilities. `predictions` are unchanged.
+
 ### Changed
 
 - The documentation is built with `scverse-doc` on Sphinx 9 and uses its sidebar layout:

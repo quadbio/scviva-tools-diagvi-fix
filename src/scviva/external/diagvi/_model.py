@@ -74,6 +74,19 @@ class DIAGVI(SpatialBaseModel, VAEMixin):
         Number of hidden layers used for encoder and decoder NNs.
     dropout_rate
         Dropout rate for neural networks.
+    classification_loss
+        Loss of the semi-supervised classifiers on labelled cells: ``"ce"`` (default,
+        cross-entropy as in earlier releases) or ``"logitnorm"`` (LogitNorm, Wei et al.,
+        ICML 2022, arXiv:2205.09310). See :class:`~scviva.external.diagvi._module.DIAGVAE`.
+    logitnorm_tau
+        Temperature of the LogitNorm loss, > 0. Only used with ``classification_loss="logitnorm"``.
+    classifier_logits
+        Whether the classifiers return logits. ``None`` (default) means ``True`` for
+        ``"logitnorm"`` and ``False`` for ``"ce"``. With ``False`` the classifiers end in a
+        softmax and ``"ce"`` applies ``cross_entropy`` to probabilities (a double softmax),
+        which is kept as the default so that earlier results stay reproducible.
+        ``classification_loss="ce"`` with ``classifier_logits=True`` is plain cross-entropy on
+        logits; its class gradient is stronger, so ``lam_class`` may need lowering.
     **model_kwargs
         Additional keyword arguments for :class:`~scviva.external.diagvi._module.DIAGVAE`.
 
@@ -97,6 +110,9 @@ class DIAGVI(SpatialBaseModel, VAEMixin):
         n_hidden: int = 256,
         n_layers: int = 2,
         dropout_rate: float = 0.1,
+        classification_loss: Literal["ce", "logitnorm"] = "ce",
+        logitnorm_tau: float = 0.1,
+        classifier_logits: bool | None = None,
         **model_kwargs,
     ):
         # Handle MuData input by extracting modalities as dict
@@ -160,6 +176,9 @@ class DIAGVI(SpatialBaseModel, VAEMixin):
             n_hidden=n_hidden,
             n_layers=n_layers,
             dropout_rate=dropout_rate,
+            classification_loss=classification_loss,
+            logitnorm_tau=logitnorm_tau,
+            classifier_logits=classifier_logits,
             **model_kwargs,
         )
 
@@ -168,7 +187,8 @@ class DIAGVI(SpatialBaseModel, VAEMixin):
             f"n_inputs: {n_inputs}, n_batches: {n_batches}, n_labels: {n_labels}, "
             f"semi_supervised: {semi_supervised}, gmm_priors: {gmm_priors}, "
             f"generative distributions: {generative_distributions}, "
-            f"n_latent: {n_latent}."
+            f"n_latent: {n_latent}, classification_loss: {classification_loss}, "
+            f"classifier_logits: {self.module.classifier_logits}."
         )
 
         self.init_params_ = self._get_init_params(locals())
@@ -1285,9 +1305,14 @@ class DIAGVI(SpatialBaseModel, VAEMixin):
             logits = classifier(z)
             all_logits.append(logits.cpu())
 
-        # Concatenate all logits and compute predictions
+        # Concatenate all outputs and compute predictions. The classifier returns logits
+        # only if built with `logits=True`; otherwise it already ends in a softmax and
+        # its output are the class probabilities.
         all_logits = torch.cat(all_logits, dim=0)
-        probabilities = torch.nn.functional.softmax(all_logits, dim=-1).numpy()
+        if classifier.logits:
+            probabilities = torch.nn.functional.softmax(all_logits, dim=-1).numpy()
+        else:
+            probabilities = all_logits.numpy()
         predicted_indices = torch.argmax(all_logits, dim=1).numpy()
         confidence = probabilities.max(axis=1)
         predictions = label_categories[predicted_indices]

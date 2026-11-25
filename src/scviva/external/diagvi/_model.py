@@ -75,16 +75,17 @@ class DIAGVI(SpatialBaseModel, VAEMixin):
     dropout_rate
         Dropout rate for neural networks.
     classification_loss
-        Loss of the semi-supervised classifiers on labelled cells: ``"ce"`` (default,
-        cross-entropy as in earlier releases) or ``"logitnorm"`` (LogitNorm, Wei et al.,
-        ICML 2022, arXiv:2205.09310). See :class:`~scviva.external.diagvi._module.DIAGVAE`.
+        Loss of the semi-supervised classifiers on labelled cells: ``"logitnorm"`` (default;
+        LogitNorm, Wei et al., ICML 2022, arXiv:2205.09310) or ``"ce"`` (cross-entropy).
+        Pass ``"ce"`` to reproduce models trained before LogitNorm became the default. See
+        :class:`~scviva.external.diagvi._module.DIAGVAE`.
     logitnorm_tau
         Temperature of the LogitNorm loss, > 0. Only used with ``classification_loss="logitnorm"``.
     classifier_logits
         Whether the classifiers return logits. ``None`` (default) means ``True`` for
-        ``"logitnorm"`` and ``False`` for ``"ce"``. With ``False`` the classifiers end in a
-        softmax and ``"ce"`` applies ``cross_entropy`` to probabilities (a double softmax),
-        which is kept as the default so that earlier results stay reproducible.
+        ``"logitnorm"`` and ``False`` for ``"ce"``. With ``classification_loss="ce"`` and
+        ``classifier_logits=False`` the classifiers end in a softmax and ``cross_entropy`` is
+        applied to probabilities (a double softmax): the loss of earlier releases.
         ``classification_loss="ce"`` with ``classifier_logits=True`` is plain cross-entropy on
         logits; its class gradient is stronger, so ``lam_class`` may need lowering.
     **model_kwargs
@@ -110,7 +111,7 @@ class DIAGVI(SpatialBaseModel, VAEMixin):
         n_hidden: int = 256,
         n_layers: int = 2,
         dropout_rate: float = 0.1,
-        classification_loss: Literal["ce", "logitnorm"] = "ce",
+        classification_loss: Literal["ce", "logitnorm"] = "logitnorm",
         logitnorm_tau: float = 0.1,
         classifier_logits: bool | None = None,
         **model_kwargs,
@@ -674,6 +675,7 @@ class DIAGVI(SpatialBaseModel, VAEMixin):
         indices: dict[str, Sequence[int]] | None = None,
         batch_size: int = 1024,
         backend: str = "cpu",
+        give_mean: bool = False,
     ) -> dict[str, np.ndarray]:
         """Return the latent space embedding for each dataset.
 
@@ -689,6 +691,11 @@ class DIAGVI(SpatialBaseModel, VAEMixin):
         backend
             ``"cpu"`` (default) returns numpy arrays as normal. ``"rapids"`` transfers
             each modality's result to a cupy array (requires ``pip install cuml``).
+        give_mean
+            If ``False`` (default), return one sample from each cell's posterior over
+            its latent, drawn with the global torch random state (set
+            ``scvi.settings.seed`` first for a reproducible draw). If ``True``, return the
+            posterior mean.
 
         Returns
         -------
@@ -720,7 +727,9 @@ class DIAGVI(SpatialBaseModel, VAEMixin):
             for tensors in scdl:
                 latent.append(
                     self.module.inference(
-                        **self.module._get_inference_input(tensors), mode=input_name
+                        **self.module._get_inference_input(tensors),
+                        mode=input_name,
+                        deterministic=give_mean,
                     )["z"]
                     .cpu()
                     .detach()
@@ -1188,6 +1197,10 @@ class DIAGVI(SpatialBaseModel, VAEMixin):
 
         non_kwargs.pop("adatas", None)
         kwargs.pop("adatas", None)
+        # Models saved before ``classification_loss`` existed were trained with cross-entropy;
+        # keep that rather than the newer "logitnorm" default.
+        if "classification_loss" not in non_kwargs and "classification_loss" not in kwargs:
+            non_kwargs["classification_loss"] = "ce"
 
         model = cls(adatas, **non_kwargs, **kwargs)
 

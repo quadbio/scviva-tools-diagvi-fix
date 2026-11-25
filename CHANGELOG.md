@@ -10,13 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **DiagVI: LogitNorm classification loss and a classifier-logits option.** `DIAGVI` (and
-  `DIAGVAE`) take `classification_loss` (`"ce"`, the default, or `"logitnorm"`),
+  `DIAGVAE`) take `classification_loss` (`"logitnorm"`, the default, or `"ce"`),
   `logitnorm_tau` (default 0.1) and `classifier_logits`. `"logitnorm"` is the LogitNorm loss
   of Wei et al. (ICML 2022, [arXiv:2205.09310](https://arxiv.org/abs/2205.09310), eq. 4) on the
-  classifier logits. The default classifiers still end in a softmax, so `"ce"` keeps the
-  cross-entropy on probabilities (a double softmax, as in scANVI before scvi-tools 1.1) and
-  reproduces earlier results exactly; `classifier_logits=True` gives plain cross-entropy on
-  logits. The new arguments are saved with the model; models saved before load with the defaults.
+  classifier logits. `"ce"` with the default `classifier_logits=False` keeps the cross-entropy
+  on softmax probabilities (a double softmax, as in scANVI before scvi-tools 1.1) and
+  reproduces earlier results exactly; `"ce"` with `classifier_logits=True` gives plain
+  cross-entropy on logits. The new arguments are saved with the model.
+- **DiagVI: `get_latent_representation(give_mean=...)`.** `give_mean=True` returns the
+  posterior mean; the default (`False`) still returns one posterior sample per cell, drawn with
+  the global torch random state (set `scvi.settings.seed` for a reproducible draw).
 
 ### Fixed
 
@@ -26,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **DiagVI: the default classification loss is now LogitNorm** (`classification_loss="logitnorm"`,
+  logit classifiers, `logitnorm_tau=0.1`). Pass `classification_loss="ce"` to train as earlier
+  releases did. Models saved before the option existed load with `"ce"`, the loss they were
+  trained with.
 - The documentation is built with `scverse-doc` on Sphinx 9 and uses its sidebar layout:
   Getting started, Guides (tutorials, user guide, developer documentation, architecture, FAQ),
   Reference (API, models) and Project, with a new citation page, following

@@ -128,14 +128,14 @@ class DIAGVAE(BaseModuleClass):
     classification_loss
         Loss of the semi-supervised classifiers on labelled cells. One of:
 
-        * ``"ce"`` (default): cross-entropy. With ``classifier_logits=False`` (the default
-          for ``"ce"``) the classifiers end in a softmax and ``cross_entropy`` is applied to
-          their probabilities (a second softmax). This reproduces the loss of earlier
-          releases exactly and is kept as the default for reproducibility.
-        * ``"logitnorm"``: LogitNorm (Wei et al., ICML 2022, arXiv:2205.09310, eq. 4),
-          the cross-entropy of ``f / (logitnorm_tau * ||f||_2)`` on the classifier logits ``f``.
-          The loss cannot be lowered by growing the logit norm, which bounds the margin
-          the classifier can enforce on the latent space. Always uses logits.
+        * ``"logitnorm"`` (default): LogitNorm (Wei et al., ICML 2022, arXiv:2205.09310,
+          eq. 4), the cross-entropy of ``f / (logitnorm_tau * ||f||_2)`` on the classifier
+          logits ``f``. The loss cannot be lowered by growing the logit norm, which bounds the
+          margin the classifier can enforce on the latent space. Always uses logits.
+        * ``"ce"``: cross-entropy. With ``classifier_logits=False`` (the default for
+          ``"ce"``) the classifiers end in a softmax and ``cross_entropy`` is applied to their
+          probabilities (a second softmax). This reproduces the loss of earlier releases
+          exactly.
     logitnorm_tau
         Temperature ``tau`` of the LogitNorm loss. Must be > 0. Only used with
         ``classification_loss="logitnorm"``.
@@ -163,7 +163,7 @@ class DIAGVAE(BaseModuleClass):
         n_hidden: int,
         n_layers: int,
         dropout_rate: float,
-        classification_loss: Literal["ce", "logitnorm"] = "ce",
+        classification_loss: Literal["ce", "logitnorm"] = "logitnorm",
         logitnorm_tau: float = 0.1,
         classifier_logits: bool | None = None,
     ):
